@@ -1,18 +1,30 @@
+import { useState, useEffect } from 'react';
 import { FileText, Download, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-
-const resources = [
-  { id: 1, title: '2026학년도 수능 국어 기출 분석집 (상)', type: 'PDF', size: '12.4MB', date: '2026-03-20' },
-  { id: 2, title: '필수 문학 작품 100선 핵심 정리 노트', type: 'PDF', size: '8.2MB', date: '2026-03-15' },
-  { id: 3, title: '독서 지문 구조화 연습 워크북', type: 'PDF', size: '15.1MB', date: '2026-03-10' },
-  { id: 4, title: '3월 학력평가 대비 모의고사 및 해설지', type: 'PDF', size: '5.7MB', date: '2026-03-05' },
-];
+import { supabase } from '../supabase';
 
 export default function Resources() {
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin } = useAuth();
+  const [resources, setResources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (loading) {
+  useEffect(() => {
+    const fetchResources = async () => {
+      const { data, error } = await supabase
+        .from('resources')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) console.error("Error fetching resources:", error);
+      else setResources(data || []);
+      setLoading(false);
+    };
+
+    fetchResources();
+  }, []);
+
+  if (authLoading) {
     return (
       <div className="pt-48 pb-24 min-h-screen flex items-center justify-center bg-white">
         <div className="w-10 h-10 border-4 border-navy-200 border-t-navy-900 rounded-full animate-spin" />
@@ -74,26 +86,36 @@ export default function Resources() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {resources.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
-                    <td className="px-6 py-5">
-                      <div className="flex items-center gap-3">
-                        <FileText size={20} className="text-navy-400" />
-                        <span className="text-sm font-medium text-gray-900 group-hover:text-navy-600 transition-colors">
-                          {item.title}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-sm text-gray-500">{item.type}</td>
-                    <td className="px-6 py-5 text-sm text-gray-500">{item.size}</td>
-                    <td className="px-6 py-5 text-sm text-gray-500">{item.date}</td>
-                    <td className="px-6 py-5 text-right">
-                      <button className="p-2 text-navy-600 hover:bg-navy-50 rounded-lg transition-colors">
-                        <Download size={20} />
-                      </button>
-                    </td>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">불러오는 중...</td>
                   </tr>
-                ))}
+                ) : resources.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">등록된 자료가 없습니다.</td>
+                  </tr>
+                ) : (
+                  resources.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors group">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-3">
+                          <FileText size={20} className="text-navy-400" />
+                          <span className="text-sm font-medium text-gray-900 group-hover:text-navy-600 transition-colors">
+                            {item.title}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-sm text-gray-500">{item.file_type}</td>
+                      <td className="px-6 py-5 text-sm text-gray-500">{item.file_size}</td>
+                      <td className="px-6 py-5 text-sm text-gray-500">{new Date(item.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-5 text-right">
+                        <button className="p-2 text-navy-600 hover:bg-navy-50 rounded-lg transition-colors">
+                          <Download size={20} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

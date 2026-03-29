@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Settings, Layout, Users, FileText, Bell, MessageSquare, Star, Save, Plus, Trash2, Edit, Check, X } from 'lucide-react';
+import { Settings, Layout, Users, FileText, Bell, MessageSquare, Star, Save, Plus, Trash2, Edit, Check, X, LogOut } from 'lucide-react';
 import { supabase } from '../supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const tabs = [
   { id: 'general', name: '일반 설정', icon: Settings },
@@ -12,39 +14,52 @@ const tabs = [
 ];
 
 export default function Admin() {
+  const { isAdmin, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('general');
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [isAdding, setIsAdding] = useState(false);
+  const [newItem, setNewItem] = useState({ title: '', content: '', category: '', description: '', video_url: '', file_url: '', file_type: '', file_size: '' });
+
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      navigate('/');
+    }
+  }, [isAdmin, authLoading, navigate]);
 
   useEffect(() => {
     if (activeTab === 'users') {
-      const fetchPendingUsers = async () => {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('status', 'pending');
-        
-        if (error) {
-          console.error("Error fetching pending users:", error);
-        } else {
-          setPendingUsers(data || []);
-        }
-      };
-
       fetchPendingUsers();
-
-      // Set up real-time subscription
-      const subscription = supabase
-        .channel('profiles_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
-          fetchPendingUsers();
-        })
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(subscription);
-      };
+    } else if (['lectures', 'resources', 'notices', 'reviews'].includes(activeTab)) {
+      fetchItems();
     }
   }, [activeTab]);
+
+  const fetchPendingUsers = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('status', 'pending');
+    
+    if (error) console.error("Error fetching pending users:", error);
+    else setPendingUsers(data || []);
+    setLoading(false);
+  };
+
+  const fetchItems = async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from(activeTab)
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) console.error(`Error fetching ${activeTab}:`, error);
+    else setItems(data || []);
+    setLoading(false);
+  };
 
   const handleUserStatus = async (userId: string, status: 'approved' | 'rejected') => {
     try {
@@ -54,10 +69,63 @@ export default function Admin() {
         .eq('id', userId);
       
       if (error) throw error;
+      fetchPendingUsers();
     } catch (error) {
       console.error("Error updating user status:", error);
     }
   };
+
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      const { error } = await supabase
+        .from(activeTab)
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      fetchItems();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+    }
+  };
+
+  const handleAddItem = async () => {
+    let table = '';
+    let payload: any = { title: newItem.title };
+
+    switch (activeTab) {
+      case 'notices':
+        table = 'notices';
+        payload = { ...payload, content: newItem.content, category: newItem.category || '일반', important: false };
+        break;
+      case 'lectures':
+        table = 'lectures';
+        payload = { ...payload, description: newItem.description, video_url: newItem.video_url, is_locked: true };
+        break;
+      case 'resources':
+        table = 'resources';
+        payload = { ...payload, description: newItem.description, file_url: newItem.file_url, file_type: newItem.file_type || 'PDF', file_size: newItem.file_size || '0MB' };
+        break;
+      case 'reviews':
+        table = 'reviews';
+        payload = { ...payload, content: newItem.content };
+        break;
+    }
+
+    if (!table) return;
+
+    const { error } = await supabase.from(table).insert([payload]);
+    if (error) {
+      alert('Error adding item: ' + error.message);
+    } else {
+      setIsAdding(false);
+      setNewItem({ title: '', content: '', category: '', description: '', video_url: '', file_url: '', file_type: '', file_size: '' });
+      fetchItems();
+    }
+  };
+
+  if (authLoading) return null;
+  if (!isAdmin) return null;
 
   return (
     <div className="pt-24 min-h-screen bg-gray-50 flex">
@@ -91,10 +159,21 @@ export default function Admin() {
             <h1 className="text-2xl font-bold text-navy-950">
               {tabs.find(t => t.id === activeTab)?.name}
             </h1>
-            <button className="flex items-center gap-2 px-4 py-2 bg-navy-900 text-white rounded-lg text-sm font-bold hover:bg-navy-800 transition-colors">
-              <Save size={18} />
-              변경사항 저장
-            </button>
+            <div className="flex gap-2">
+              {['lectures', 'resources', 'notices', 'reviews'].includes(activeTab) && (
+                <button 
+                  onClick={() => setIsAdding(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-navy-900 text-white rounded-lg text-sm font-bold hover:bg-navy-800 transition-colors"
+                >
+                  <Plus size={18} />
+                  새 항목 추가
+                </button>
+              )}
+              <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-navy-900 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">
+                <Save size={18} />
+                변경사항 저장
+              </button>
+            </div>
           </div>
 
           {activeTab === 'users' && (
@@ -104,13 +183,15 @@ export default function Admin() {
                 <p className="text-sm text-gray-500">가입 신청 후 승인이 필요한 회원 목록입니다.</p>
               </div>
               <div className="divide-y divide-gray-100">
-                {pendingUsers.length === 0 ? (
+                {loading ? (
+                  <div className="p-12 text-center text-gray-400">불러오는 중...</div>
+                ) : pendingUsers.length === 0 ? (
                   <div className="p-12 text-center text-gray-400">대기 중인 회원이 없습니다.</div>
                 ) : (
                   pendingUsers.map((user) => (
                     <div key={user.id} className="p-6 flex items-center justify-between">
                       <div>
-                        <div className="text-sm font-bold text-navy-950">{user.displayName}</div>
+                        <div className="text-sm font-bold text-navy-950">{user.full_name}</div>
                         <div className="text-xs text-gray-500">{user.email}</div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -151,55 +232,124 @@ export default function Admin() {
                   </div>
                 </div>
               </div>
-
-              <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold text-navy-950 mb-6">브랜딩 설정</h3>
-                <div className="grid grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">포인트 컬러 (Primary)</label>
-                    <div className="flex gap-2">
-                      <input type="color" defaultValue="#102a43" className="h-10 w-20 rounded border border-gray-200" />
-                      <input type="text" defaultValue="#102a43" className="flex-1 px-4 py-2 rounded-lg border border-gray-200 outline-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-gray-700 mb-2">폰트 설정</label>
-                    <select className="w-full px-4 py-2 rounded-lg border border-gray-200 outline-none">
-                      <option>Inter (기본)</option>
-                      <option>Noto Sans KR</option>
-                      <option>Pretendard</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
-          {activeTab !== 'general' && (
+          {['lectures', 'resources', 'notices', 'reviews'].includes(activeTab) && (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                <span className="text-sm text-gray-500">총 4개의 항목이 있습니다.</span>
-                <button className="flex items-center gap-2 px-3 py-1.5 bg-navy-50 text-navy-900 rounded-lg text-xs font-bold hover:bg-navy-100 transition-colors">
-                  <Plus size={14} />
-                  새 항목 추가
-                </button>
+                <span className="text-sm text-gray-500">총 {items.length}개의 항목이 있습니다.</span>
               </div>
+
+              {isAdding && (
+                <div className="p-6 bg-gray-50 border-b border-gray-100 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="제목" 
+                      className="px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                      value={newItem.title}
+                      onChange={(e) => setNewItem({...newItem, title: e.target.value})}
+                    />
+                    {activeTab === 'notices' && (
+                      <input 
+                        type="text" 
+                        placeholder="카테고리 (학원소식, 이벤트 등)" 
+                        className="px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                        value={newItem.category}
+                        onChange={(e) => setNewItem({...newItem, category: e.target.value})}
+                      />
+                    )}
+                    {activeTab === 'lectures' && (
+                      <input 
+                        type="text" 
+                        placeholder="비디오 URL (YouTube Embed)" 
+                        className="px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                        value={newItem.video_url}
+                        onChange={(e) => setNewItem({...newItem, video_url: e.target.value})}
+                      />
+                    )}
+                    {activeTab === 'resources' && (
+                      <>
+                        <input 
+                          type="text" 
+                          placeholder="파일 유형 (PDF, ZIP 등)" 
+                          className="px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                          value={newItem.file_type}
+                          onChange={(e) => setNewItem({...newItem, file_type: e.target.value})}
+                        />
+                        <input 
+                          type="text" 
+                          placeholder="파일 용량 (예: 2.4MB)" 
+                          className="px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                          value={newItem.file_size}
+                          onChange={(e) => setNewItem({...newItem, file_size: e.target.value})}
+                        />
+                      </>
+                    )}
+                  </div>
+                  <textarea 
+                    rows={3} 
+                    placeholder={activeTab === 'lectures' || activeTab === 'resources' ? '설명' : '내용'} 
+                    className="w-full px-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-navy-500"
+                    value={activeTab === 'lectures' || activeTab === 'resources' ? newItem.description : newItem.content}
+                    onChange={(e) => {
+                      if (activeTab === 'lectures' || activeTab === 'resources') {
+                        setNewItem({...newItem, description: e.target.value});
+                      } else {
+                        setNewItem({...newItem, content: e.target.value});
+                      }
+                    }}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button 
+                      onClick={() => setIsAdding(false)}
+                      className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700"
+                    >
+                      취소
+                    </button>
+                    <button 
+                      onClick={handleAddItem}
+                      className="px-6 py-2 bg-navy-900 text-white text-sm font-bold rounded-lg hover:bg-navy-800"
+                    >
+                      저장하기
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div className="divide-y divide-gray-100">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg" />
-                      <div>
-                        <div className="text-sm font-bold text-navy-950">샘플 항목 제목 {i}</div>
-                        <div className="text-xs text-gray-400">2026-03-29 | 박상혁</div>
+                {loading ? (
+                  <div className="p-12 text-center text-gray-400">불러오는 중...</div>
+                ) : items.length === 0 ? (
+                  <div className="p-12 text-center text-gray-400">등록된 항목이 없습니다.</div>
+                ) : (
+                  items.map((item) => (
+                    <div key={item.id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                          {activeTab === 'notices' && <Bell size={20} className="text-gray-400" />}
+                          {activeTab === 'lectures' && <Layout size={20} className="text-gray-400" />}
+                          {activeTab === 'resources' && <FileText size={20} className="text-gray-400" />}
+                          {activeTab === 'reviews' && <Star size={20} className="text-gray-400" />}
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-navy-950">{item.title}</div>
+                          <div className="text-xs text-gray-400">{new Date(item.created_at).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button className="p-2 text-gray-400 hover:text-navy-600 transition-colors"><Edit size={18} /></button>
+                        <button 
+                          onClick={() => handleDeleteItem(item.id)}
+                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button className="p-2 text-gray-400 hover:text-navy-600 transition-colors"><Edit size={18} /></button>
-                      <button className="p-2 text-gray-400 hover:text-red-600 transition-colors"><Trash2 size={18} /></button>
-                    </div>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
           )}

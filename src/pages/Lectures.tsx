@@ -1,60 +1,31 @@
 import { BookOpen, Play, Clock, User, Lock, AlertCircle, X, PlayCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
-import React, { useState } from 'react';
-
-const lectures = [
-  {
-    id: 1,
-    title: '2026 수능 국어 입문: 지문 분석의 기초',
-    instructor: '박상혁',
-    duration: '15강 / 450분',
-    category: '기초입문',
-    image: 'https://picsum.photos/seed/lecture1/800/600',
-    price: '무료',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Sample YouTube Embed URL
-    isLocked: false,
-  },
-  {
-    id: 2,
-    title: '독서(비문학) 고난도 지문 정복 프로젝트',
-    instructor: '박상혁',
-    duration: '20강 / 600분',
-    category: '심화학습',
-    image: 'https://picsum.photos/seed/lecture2/800/600',
-    price: '120,000원',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    isLocked: true,
-  },
-  {
-    id: 3,
-    title: '문학 필수 작품 100선 총정리',
-    instructor: '박상혁',
-    duration: '25강 / 750분',
-    category: '개념완성',
-    image: 'https://picsum.photos/seed/lecture3/800/600',
-    price: '150,000원',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    isLocked: true,
-  },
-  {
-    id: 4,
-    title: '고전시가 10일 완성 특강',
-    instructor: '박상혁',
-    duration: '10강 / 300분',
-    category: '테마특강',
-    image: 'https://picsum.photos/seed/lecture4/800/600',
-    price: '80,000원',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    isLocked: false,
-  },
-];
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 
 export default function Lectures() {
-  const { user, profile, loading, isAdmin } = useAuth();
+  const { user, profile, loading: authLoading, isAdmin } = useAuth();
+  const [lectures, setLectures] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<string | null>(null);
 
-  if (loading) {
+  useEffect(() => {
+    const fetchLectures = async () => {
+      const { data, error } = await supabase
+        .from('lectures')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) console.error("Error fetching lectures:", error);
+      else setLectures(data || []);
+      setLoading(false);
+    };
+
+    fetchLectures();
+  }, []);
+
+  if (authLoading) {
     return (
       <div className="pt-48 pb-24 min-h-screen flex items-center justify-center bg-gray-50">
         <div className="w-10 h-10 border-4 border-navy-200 border-t-navy-900 rounded-full animate-spin" />
@@ -64,9 +35,9 @@ export default function Lectures() {
 
   const isApproved = isAdmin || profile?.status === 'approved';
 
-  const handlePlay = (lecture: typeof lectures[0]) => {
-    if (isAdmin || !lecture.isLocked) {
-      setSelectedVideo(lecture.videoUrl);
+  const handlePlay = (lecture: any) => {
+    if (isAdmin || !lecture.is_locked) {
+      setSelectedVideo(lecture.video_url);
     }
   };
 
@@ -111,77 +82,80 @@ export default function Lectures() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {lectures.map((lecture) => {
-              const lectureLocked = !isAdmin && lecture.isLocked;
-              return (
-                <div 
-                  key={lecture.id} 
-                  className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 transition-all group ${lectureLocked ? 'opacity-75' : 'hover:shadow-xl'}`}
-                >
-                  <div className="relative aspect-video overflow-hidden">
-                    <img 
-                      src={lecture.image} 
-                      alt={lecture.title} 
-                      className={`w-full h-full object-cover transition-transform duration-500 ${lectureLocked ? 'grayscale' : 'group-hover:scale-105'}`}
-                      referrerPolicy="no-referrer"
-                    />
-                    <div 
-                      onClick={() => handlePlay(lecture)}
-                      className={`absolute inset-0 transition-colors flex items-center justify-center cursor-pointer ${
-                        lectureLocked 
-                          ? 'bg-black/40' 
-                          : 'bg-black/0 group-hover:bg-black/40 opacity-0 group-hover:opacity-100'
-                      }`}
-                    >
-                      {lectureLocked ? (
-                        <div className="flex flex-col items-center gap-2 text-white">
-                          <Lock size={32} />
-                          <span className="text-xs font-bold">수강 권한 없음</span>
-                        </div>
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-white text-navy-950 flex items-center justify-center shadow-lg">
-                          <Play size={24} fill="currentColor" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute top-4 left-4 px-3 py-1 bg-navy-900/80 backdrop-blur-md text-white text-xs font-bold rounded-full">
-                      {lecture.category}
-                    </div>
-                  </div>
-                  
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-navy-950 mb-3 line-clamp-2">{lecture.title}</h3>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
-                      <div className="flex items-center gap-1">
-                        <User size={16} />
-                        {lecture.instructor}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock size={16} />
-                        {lecture.duration}
+            {loading ? (
+              <div className="col-span-full p-12 text-center text-gray-400">불러오는 중...</div>
+            ) : lectures.length === 0 ? (
+              <div className="col-span-full p-12 text-center text-gray-400">등록된 강의가 없습니다.</div>
+            ) : (
+              lectures.map((lecture) => {
+                const lectureLocked = !isAdmin && lecture.is_locked;
+                return (
+                  <div 
+                    key={lecture.id} 
+                    className={`bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 transition-all group ${lectureLocked ? 'opacity-75' : 'hover:shadow-xl'}`}
+                  >
+                    <div className="relative aspect-video overflow-hidden">
+                      <img 
+                        src={lecture.thumbnail_url || `https://picsum.photos/seed/${lecture.id}/800/600`} 
+                        alt={lecture.title} 
+                        className={`w-full h-full object-cover transition-transform duration-500 ${lectureLocked ? 'grayscale' : 'group-hover:scale-105'}`}
+                        referrerPolicy="no-referrer"
+                      />
+                      <div 
+                        onClick={() => handlePlay(lecture)}
+                        className={`absolute inset-0 transition-colors flex items-center justify-center cursor-pointer ${
+                          lectureLocked 
+                            ? 'bg-black/40' 
+                            : 'bg-black/0 group-hover:bg-black/40 opacity-0 group-hover:opacity-100'
+                        }`}
+                      >
+                        {lectureLocked ? (
+                          <div className="flex flex-col items-center gap-2 text-white">
+                            <Lock size={32} />
+                            <span className="text-xs font-bold">수강 권한 없음</span>
+                          </div>
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-white text-navy-950 flex items-center justify-center shadow-lg">
+                            <Play size={24} fill="currentColor" />
+                          </div>
+                        )}
                       </div>
                     </div>
                     
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                      <div className="text-lg font-bold text-navy-900">{lecture.price}</div>
-                      {lectureLocked ? (
-                        <button className="px-4 py-2 bg-gray-100 text-gray-400 rounded-lg text-sm font-bold cursor-not-allowed">
-                          수강 불가
-                        </button>
-                      ) : (
-                        <button 
-                          onClick={() => handlePlay(lecture)}
-                          className="px-4 py-2 bg-navy-100 text-navy-900 rounded-lg text-sm font-bold hover:bg-navy-200 transition-colors flex items-center gap-2"
-                        >
-                          <PlayCircle size={16} />
-                          강의 보기
-                        </button>
-                      )}
+                    <div className="p-6">
+                      <h3 className="text-xl font-bold text-navy-950 mb-3 line-clamp-2">{lecture.title}</h3>
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-6">
+                        <div className="flex items-center gap-1">
+                          <User size={16} />
+                          박상혁
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock size={16} />
+                          60분
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+                        <div className="text-lg font-bold text-navy-900">무료</div>
+                        {lectureLocked ? (
+                          <button className="px-4 py-2 bg-gray-100 text-gray-400 rounded-lg text-sm font-bold cursor-not-allowed">
+                            수강 불가
+                          </button>
+                        ) : (
+                          <button 
+                            onClick={() => handlePlay(lecture)}
+                            className="px-4 py-2 bg-navy-100 text-navy-900 rounded-lg text-sm font-bold hover:bg-navy-200 transition-colors flex items-center gap-2"
+                          >
+                            <PlayCircle size={16} />
+                            강의 보기
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         )}
       </div>
