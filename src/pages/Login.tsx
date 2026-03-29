@@ -10,9 +10,18 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [saveId, setSaveId] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    const savedEmail = localStorage.getItem('savedEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setSaveId(true);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +30,11 @@ export default function Login() {
 
     try {
       if (isLogin) {
+        if (saveId) {
+          localStorage.setItem('savedEmail', email);
+        } else {
+          localStorage.removeItem('savedEmail');
+        }
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
@@ -45,21 +59,6 @@ export default function Login() {
       setMessage({ type: 'error', text: error.message || '오류가 발생했습니다.' });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin,
-        }
-      });
-      if (error) throw error;
-    } catch (error: any) {
-      console.error("Login failed:", error);
-      setMessage({ type: 'error', text: 'Google 로그인에 실패했습니다.' });
     }
   };
 
@@ -167,8 +166,13 @@ export default function Login() {
             {isLogin && (
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
-                  <input type="checkbox" className="h-4 w-4 text-navy-600 focus:ring-navy-500 border-gray-300 rounded" />
-                  <label className="ml-2 block text-xs text-gray-500">로그인 유지</label>
+                  <input 
+                    type="checkbox" 
+                    checked={saveId}
+                    onChange={(e) => setSaveId(e.target.checked)}
+                    className="h-4 w-4 text-navy-600 focus:ring-navy-500 border-gray-300 rounded cursor-pointer" 
+                  />
+                  <label className="ml-2 block text-xs text-gray-500 cursor-pointer" onClick={() => setSaveId(!saveId)}>아이디 저장</label>
                 </div>
                 <div className="text-xs">
                   <a href="#" className="font-bold text-navy-600 hover:text-navy-500">비밀번호 찾기</a>
@@ -191,27 +195,6 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          <div className="mt-8">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-100"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase tracking-widest">
-                <span className="px-4 bg-white text-gray-400">Or continue with</span>
-              </div>
-            </div>
-
-            <div className="mt-6">
-              <button 
-                onClick={handleGoogleLogin}
-                className="w-full flex justify-center items-center gap-3 py-3 px-4 border border-gray-200 rounded-xl text-sm font-bold text-gray-700 bg-white hover:bg-gray-50 transition-all"
-              >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
-                Google로 계속하기
-              </button>
-            </div>
-          </div>
 
           <p className="mt-8 text-center text-sm text-gray-500">
             {isLogin ? '아직 회원이 아니신가요?' : '이미 회원이신가요?'}
