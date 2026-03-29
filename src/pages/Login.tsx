@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { LogIn, Mail, Lock, ArrowRight, User as UserIcon } from 'lucide-react';
+import { LogIn, Mail, Lock, ArrowRight, User as UserIcon, Phone } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
 
@@ -9,6 +9,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export default function Login() {
           options: {
             data: {
               full_name: fullName,
+              phone: phone,
             },
           },
         });
@@ -70,9 +72,11 @@ export default function Login() {
           </Link>
         </div>
         
-        <div className="bg-white py-10 px-6 shadow-2xl shadow-navy-900/5 sm:rounded-3xl sm:px-12 border border-gray-100">
+        <div className={`bg-white py-10 px-6 shadow-2xl shadow-navy-900/5 sm:rounded-3xl sm:px-12 border transition-all duration-500 ${
+          isLogin ? 'border-gray-100' : 'border-navy-200 ring-4 ring-navy-50'
+        }`}>
           <div className="mb-8 text-center">
-            <h2 className="text-2xl font-bold text-navy-950">
+            <h2 className={`text-2xl font-bold transition-colors duration-500 ${isLogin ? 'text-navy-950' : 'text-navy-600'}`}>
               {isLogin ? '다시 만나서 반가워요!' : '새로운 시작을 환영합니다!'}
             </h2>
             <p className="mt-2 text-sm text-gray-500">
@@ -90,22 +94,40 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-2">이름</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                    <UserIcon size={18} />
+              <>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">이름</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                      <UserIcon size={18} />
+                    </div>
+                    <input
+                      required
+                      type="text"
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      className="block w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-navy-500 focus:border-transparent transition-all outline-none"
+                      placeholder="홍길동"
+                    />
                   </div>
-                  <input
-                    required
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="block w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-navy-500 focus:border-transparent transition-all outline-none"
-                    placeholder="홍길동"
-                  />
                 </div>
-              </div>
+                <div>
+                  <label className="block text-sm font-bold text-gray-700 mb-2">전화번호</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
+                      <Phone size={18} />
+                    </div>
+                    <input
+                      required
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      className="block w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-navy-500 focus:border-transparent transition-all outline-none"
+                      placeholder="010-0000-0000"
+                    />
+                  </div>
+                </div>
+              </>
             )}
             
             <div>

@@ -1,15 +1,17 @@
-import { useState, useEffect } from 'react';
-import { MessageSquare, Search, Plus, Lock, Unlock, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect, ChangeEvent } from 'react';
+import { MessageSquare, Search, Plus, Lock, Unlock, ChevronRight, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import BoardTabs from '../components/BoardTabs';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function QA() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [questions, setQuestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newQuestion, setNewQuestion] = useState({ title: '', content: '', is_private: false });
+  const [newQuestion, setNewQuestion] = useState({ title: '', content: '', is_private: false, image_url: '' });
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuestions();
@@ -26,6 +28,18 @@ export default function QA() {
     setLoading(false);
   };
 
+  const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmitQuestion = async () => {
     if (!user) {
       alert('로그인이 필요합니다.');
@@ -36,6 +50,14 @@ export default function QA() {
       return;
     }
 
+    let imageUrl = '';
+    if (selectedImage) {
+      // In a real app, we would upload to Supabase Storage.
+      // For this environment, we'll store the base64 string if it's small enough,
+      // or just use the preview URL as a mock.
+      imageUrl = previewUrl || '';
+    }
+
     const { error } = await supabase
       .from('questions')
       .insert([
@@ -44,7 +66,8 @@ export default function QA() {
           content: newQuestion.content, 
           is_private: newQuestion.is_private,
           author_id: user.id,
-          status: '대기중'
+          status: '대기중',
+          image_url: imageUrl
         }
       ]);
 
@@ -52,9 +75,18 @@ export default function QA() {
       alert('오류가 발생했습니다: ' + error.message);
     } else {
       setIsAdding(false);
-      setNewQuestion({ title: '', content: '', is_private: false });
+      setNewQuestion({ title: '', content: '', is_private: false, image_url: '' });
+      setSelectedImage(null);
+      setPreviewUrl(null);
       fetchQuestions();
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('questions').delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else fetchQuestions();
   };
 
   return (
@@ -110,6 +142,29 @@ export default function QA() {
                   />
                   <span className="text-sm text-gray-600">비공개로 작성하기</span>
                 </label>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-bold text-gray-700">이미지 첨부</label>
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 rounded-lg cursor-pointer hover:bg-gray-200 transition-colors text-sm font-medium">
+                      <ImageIcon size={18} />
+                      파일 선택
+                      <input type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
+                    </label>
+                    {selectedImage && <span className="text-xs text-gray-500">{selectedImage.name}</span>}
+                  </div>
+                  {previewUrl && (
+                    <div className="mt-2 relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200">
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                      <button 
+                        onClick={() => { setSelectedImage(null); setPreviewUrl(null); }}
+                        className="absolute top-2 right-2 p-1 bg-black/50 text-white rounded-full hover:bg-black/70"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex gap-2">
                 <button 
@@ -176,10 +231,25 @@ export default function QA() {
                     <span className="text-xs text-gray-400">{q.profiles?.full_name} | {new Date(q.created_at).toLocaleDateString()}</span>
                   </div>
                   <h3 className="text-lg font-bold text-gray-900 group-hover:text-navy-600 transition-colors">
-                    {q.is_private && q.author_id !== user?.id ? '비공개 질문입니다.' : q.title}
+                    {q.is_private && q.author_id !== user?.id && !isAdmin ? '비공개 질문입니다.' : q.title}
                   </h3>
+                  {(!q.is_private || q.author_id === user?.id || isAdmin) && q.image_url && (
+                    <div className="mt-3 max-w-sm rounded-lg overflow-hidden border border-gray-100">
+                      <img src={q.image_url} alt="Question attachment" className="w-full h-auto" />
+                    </div>
+                  )}
                 </div>
-                <ChevronRight size={20} className="text-gray-300 group-hover:text-navy-600 transition-colors" />
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDelete(q.id); }}
+                      className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                  <ChevronRight size={20} className="text-gray-300 group-hover:text-navy-600 transition-colors" />
+                </div>
               </div>
             ))
           )}

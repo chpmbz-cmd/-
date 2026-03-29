@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Layout, Users, FileText, Bell, MessageSquare, Star, Save, Plus, Trash2, Edit, Check, X, LogOut } from 'lucide-react';
+import { Settings, Layout, Users, FileText, Bell, MessageSquare, Star, Save, Plus, Trash2, Edit, Check, X, LogOut, Mail, Phone } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -17,7 +17,7 @@ export default function Admin() {
   const { isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('general');
-  const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -31,21 +31,21 @@ export default function Admin() {
 
   useEffect(() => {
     if (activeTab === 'users') {
-      fetchPendingUsers();
+      fetchUsers();
     } else if (['lectures', 'resources', 'notices', 'reviews'].includes(activeTab)) {
       fetchItems();
     }
   }, [activeTab]);
 
-  const fetchPendingUsers = async () => {
+  const fetchUsers = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
-      .eq('status', 'pending');
+      .order('created_at', { ascending: false });
     
-    if (error) console.error("Error fetching pending users:", error);
-    else setPendingUsers(data || []);
+    if (error) console.error("Error fetching users:", error);
+    else setUsers(data || []);
     setLoading(false);
   };
 
@@ -61,7 +61,7 @@ export default function Admin() {
     setLoading(false);
   };
 
-  const handleUserStatus = async (userId: string, status: 'approved' | 'rejected') => {
+  const handleUserStatus = async (userId: string, status: 'approved' | 'rejected' | 'pending') => {
     try {
       const { error } = await supabase
         .from('profiles')
@@ -69,7 +69,7 @@ export default function Admin() {
         .eq('id', userId);
       
       if (error) throw error;
-      fetchPendingUsers();
+      fetchUsers();
     } catch (error) {
       console.error("Error updating user status:", error);
     }
@@ -177,42 +177,84 @@ export default function Admin() {
           </div>
 
           {activeTab === 'users' && (
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-6 border-b border-gray-100">
-                <h3 className="text-lg font-bold text-navy-950">승인 대기 회원</h3>
-                <p className="text-sm text-gray-500">가입 신청 후 승인이 필요한 회원 목록입니다.</p>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {loading ? (
-                  <div className="p-12 text-center text-gray-400">불러오는 중...</div>
-                ) : pendingUsers.length === 0 ? (
-                  <div className="p-12 text-center text-gray-400">대기 중인 회원이 없습니다.</div>
-                ) : (
-                  pendingUsers.map((user) => (
-                    <div key={user.id} className="p-6 flex items-center justify-between">
-                      <div>
-                        <div className="text-sm font-bold text-navy-950">{user.full_name}</div>
-                        <div className="text-xs text-gray-500">{user.email}</div>
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-gray-100">
+                  <h3 className="text-lg font-bold text-navy-950">회원 관리</h3>
+                  <p className="text-sm text-gray-500">모든 회원의 승인 상태를 관리하고 인적사항을 확인할 수 있습니다.</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {loading ? (
+                    <div className="p-12 text-center text-gray-400">불러오는 중...</div>
+                  ) : users.length === 0 ? (
+                    <div className="p-12 text-center text-gray-400">가입된 회원이 없습니다.</div>
+                  ) : (
+                    users.map((user) => (
+                      <div key={user.id} className="p-6 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-3 mb-1">
+                            <div className="text-sm font-bold text-navy-950">{user.full_name}</div>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                              user.status === 'approved' ? 'bg-green-100 text-green-700' :
+                              user.status === 'pending' ? 'bg-orange-100 text-orange-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {user.status}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Mail size={12} />
+                              {user.email}
+                            </div>
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                              <Phone size={12} />
+                              {user.phone || '전화번호 없음'}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {user.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => handleUserStatus(user.id, 'approved')}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
+                              >
+                                <Check size={14} />
+                                승인
+                              </button>
+                              <button 
+                                onClick={() => handleUserStatus(user.id, 'rejected')}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
+                              >
+                                <X size={14} />
+                                거절
+                              </button>
+                            </>
+                          )}
+                          {user.status === 'approved' && (
+                            <button 
+                              onClick={() => handleUserStatus(user.id, 'pending')}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-orange-50 text-orange-700 rounded-lg text-xs font-bold hover:bg-orange-100 transition-colors"
+                            >
+                              <LogOut size={14} />
+                              승인 취소
+                            </button>
+                          )}
+                          {user.status === 'rejected' && (
+                            <button 
+                              onClick={() => handleUserStatus(user.id, 'pending')}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 text-gray-700 rounded-lg text-xs font-bold hover:bg-gray-100 transition-colors"
+                            >
+                              <Check size={14} />
+                              재검토
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleUserStatus(user.id, 'approved')}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
-                        >
-                          <Check size={14} />
-                          승인
-                        </button>
-                        <button 
-                          onClick={() => handleUserStatus(user.id, 'rejected')}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
-                        >
-                          <X size={14} />
-                          거절
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           )}

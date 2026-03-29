@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { User, Plus, X } from 'lucide-react';
+import { User, Plus, X, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import BoardTabs from '../components/BoardTabs';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Reviews() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -54,6 +54,13 @@ export default function Reviews() {
       setNewReview({ title: '', content: '' });
       fetchReviews();
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('reviews').delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else fetchReviews();
   };
 
   return (
@@ -139,6 +146,14 @@ export default function Reviews() {
                     <span>{new Date(review.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
+                {isAdmin && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); handleDelete(review.id); }}
+                    className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                )}
               </motion.div>
             ))
           )}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Bell, ChevronRight, Plus, X } from 'lucide-react';
+import { Bell, ChevronRight, Plus, X, Trash2 } from 'lucide-react';
 import BoardTabs from '../components/BoardTabs';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +43,13 @@ export default function Notices() {
       setNewNotice({ title: '', content: '', category: '학원소식', important: false });
       fetchNotices();
     }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    const { error } = await supabase.from('notices').delete().eq('id', id);
+    if (error) alert('삭제 실패: ' + error.message);
+    else fetchNotices();
   };
 
   return (
@@ -156,7 +163,17 @@ export default function Notices() {
                   <h3 className={`text-lg font-bold ${notice.important ? 'text-navy-900' : 'text-gray-900'} group-hover:text-navy-600 transition-colors`}>
                     {notice.title}
                   </h3>
-                  <ChevronRight size={20} className="text-gray-300 group-hover:text-navy-600 transition-colors" />
+                  <div className="flex items-center gap-2">
+                    {isAdmin && (
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDelete(notice.id); }}
+                        className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    )}
+                    <ChevronRight size={20} className="text-gray-300 group-hover:text-navy-600 transition-colors" />
+                  </div>
                 </div>
               </div>
             ))
