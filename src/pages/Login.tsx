@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { LogIn, Mail, Lock, ArrowRight, User as UserIcon } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../supabase';
-import { useNavigate } from 'react-router-dom';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -65,9 +65,9 @@ export default function Login() {
     <div className="min-h-screen pt-20 pb-12 flex flex-col justify-center bg-gray-50">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="text-center mb-8">
-          <a href="/" className="text-3xl font-bold tracking-tighter text-navy-900">
+          <Link to="/" className="text-3xl font-bold tracking-tighter text-navy-900">
             CHPM
-          </a>
+          </Link>
         </div>
         
         <div className="bg-white py-10 px-6 shadow-2xl shadow-navy-900/5 sm:rounded-3xl sm:px-12 border border-gray-100">

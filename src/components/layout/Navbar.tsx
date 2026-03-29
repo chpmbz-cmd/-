@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Menu, X, LogIn, User, BookOpen, FileText, Bell, MessageSquare, Star } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 const navItems = [
   { name: '공지사항', href: '/notices', icon: Bell },
@@ -9,9 +11,6 @@ const navItems = [
   { name: '질의응답', href: '/qa', icon: MessageSquare },
   { name: '수강후기', href: '/reviews', icon: Star },
 ];
-
-import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -43,31 +42,31 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center">
           <div className="flex-shrink-0 flex items-center">
-            <a href="/" className="flex items-center">
+            <Link to="/" className="flex items-center">
               <span className="text-2xl font-black tracking-tighter text-[#0a192f]">CHPM</span>
-            </a>
+            </Link>
           </div>
 
           {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-8">
             {navItems.map((item) => (
-              <a
+              <Link
                 key={item.name}
-                href={item.href}
+                to={item.href}
                 className="text-sm font-medium text-gray-700 hover:text-navy-600 transition-colors"
               >
                 {item.name}
-              </a>
+              </Link>
             ))}
             {isAdmin && (
-              <a href="/admin" className="text-sm font-bold text-navy-600 hover:text-navy-800">
+              <Link to="/admin" className="text-sm font-bold text-navy-600 hover:text-navy-800">
                 관리자
-              </a>
+              </Link>
             )}
             <div className="flex items-center space-x-4 pl-4">
               {user ? (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm font-medium text-gray-700">{profile?.displayName || user.email?.split('@')[0]}님</span>
+                  <span className="text-sm font-medium text-gray-700">{profile?.full_name || user.email?.split('@')[0]}님</span>
                   <button onClick={handleLogout} className="text-sm font-semibold text-gray-500 hover:text-navy-900 transition-colors">
                     로그아웃
                   </button>
@@ -104,25 +103,25 @@ export default function Navbar() {
           >
             <div className="px-4 pt-2 pb-6 space-y-1">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.name}
-                  href={item.href}
+                  to={item.href}
                   className="flex items-center gap-3 px-3 py-4 text-base font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
                   onClick={() => setIsOpen(false)}
                 >
                   <item.icon size={20} className="text-navy-600" />
                   {item.name}
-                </a>
+                </Link>
               ))}
               <div className="pt-4 border-t border-gray-100">
-                <a
-                  href="/login"
+                <Link
+                  to="/login"
                   className="flex items-center gap-3 px-3 py-4 text-base font-bold text-navy-900"
                   onClick={() => setIsOpen(false)}
                 >
                   <LogIn size={20} />
                   로그인 / 회원가입
-                </a>
+                </Link>
               </div>
             </div>
           </motion.div>
